@@ -1,3 +1,5 @@
+export const runtime = 'edge'; 
+
 import { NextResponse } from 'next/server';
 import { saveTravelPreference, saveItinerary } from '@/lib/db';
 import crypto from 'crypto';
