@@ -213,7 +213,7 @@ export default function Home() {
               <div className="flex flex-col space-y-1 mt-0 mb-1">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
-                    <Label htmlFor="budget" className="text-slate-700">预算范围（人均）</Label>
+                    <Label htmlFor="budget" className="text-slate-700">预算范围</Label>
                     
                     {/* 将"不限"复选框放在标题旁边 */}
                     <div className="flex items-center space-x-1 ml-2">
