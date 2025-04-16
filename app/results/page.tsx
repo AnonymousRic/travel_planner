@@ -300,11 +300,16 @@ export default function ResultsPage() {
                   <CardTitle className="text-xl text-slate-800">小红书旅行评价参考</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[400px] overflow-y-auto pt-4 px-5 custom-scrollbar">
-                  <div className="max-w-none whitespace-pre-line [&>p]:mb-1 [&>ul]:list-disc [&>ul]:pl-5 [&>ul_>li]:mb-1 [&>ul]:my-1">
+                  <div className="prose prose-slate max-w-none prose-headings:text-indigo-700 prose-a:text-indigo-600 whitespace-pre-line break-words">
                     <ReactMarkdown 
                       rehypePlugins={[rehypeRaw]}
                       remarkPlugins={[remarkGfm]}
-                      children={itinerary.highlights}
+                      children={itinerary.highlights
+                        .replace(/\n{2,}/g, '\n') // Consolidate multiple newlines
+                        .split('\n')              // Split into lines
+                        .filter(line => line.trim() !== '') // Remove lines with only whitespace
+                        .join('\n')              // Join back with single newlines
+                      }
                     />
                   </div>
                 </CardContent>
