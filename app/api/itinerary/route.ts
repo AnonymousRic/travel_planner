@@ -2,8 +2,6 @@ export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { saveTravelPreference, saveItinerary } from '@/lib/db';
-import crypto from 'crypto';
-import { Readable } from 'stream';
 
 interface TravelParams {
   location: string;        // 出发地点
@@ -48,34 +46,80 @@ interface Itinerary {
   highlights: string;  // 旅行红黑榜部分
 }
 
+// Helper function to convert hex string to Uint8Array
+function hexToUint8Array(hexString: string): Uint8Array {
+  if (hexString.length % 2 !== 0) {
+    throw new Error("Invalid hex string length");
+  }
+  const byteArray = new Uint8Array(hexString.length / 2);
+  for (let i = 0; i < byteArray.length; i++) {
+    byteArray[i] = parseInt(hexString.substring(i * 2, i * 2 + 2), 16);
+  }
+  return byteArray;
+}
+
+// Helper function to convert ArrayBuffer/Uint8Array to hex string
+function bytesToHex(bytes: Uint8Array | ArrayBuffer): string {
+  const byteArray = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return Array.prototype.map.call(byteArray, x => ('00' + x.toString(16)).slice(-2)).join('');
+}
+
 /**
- * 加密敏感数据
+ * 加密敏感数据 (使用 Web Crypto API for Edge Runtime)
  * 用于确保符合GDPR要求
  */
-function encryptData(data: any): string {
-  const encryptionKey = process.env.ENCRYPTION_KEY;
-  if (!encryptionKey) {
-    console.warn('未设置加密密钥，数据未加密');
-    return JSON.stringify(data);
+async function encryptData(data: any): Promise<string> { // 返回 Promise<string>
+  const encryptionKeyHex = process.env.ENCRYPTION_KEY;
+  // 确保密钥是64个十六进制字符 (对应 32 bytes for AES-256)
+  if (!encryptionKeyHex || encryptionKeyHex.length !== 64) {
+    console.warn('未设置有效加密密钥 (ENCRYPTION_KEY - 必须是64位十六进制字符)，数据未加密');
+    // 在 Edge Runtime 中返回未加密的 JSON 字符串
+    return JSON.stringify(data); 
   }
 
   try {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(encryptionKey, 'hex'), iv);
-    
-    let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    const authTag = cipher.getAuthTag();
-    
-    // 存储IV、加密数据和认证标签
+    // 1. 导入密钥
+    const keyBytes = hexToUint8Array(encryptionKeyHex);
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',              // format
+      keyBytes,           // keyData
+      { name: 'AES-GCM' },// algorithm
+      false,              // extractable
+      ['encrypt']         // keyUsages
+    );
+
+    // 2. 生成初始化向量 (IV)，AES-GCM 推荐 12 bytes (96 bits)
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    // 3. 准备要加密的数据 (转换为 Uint8Array)
+    const dataString = JSON.stringify(data);
+    const encodedData = new TextEncoder().encode(dataString);
+
+    // 4. 执行加密
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv // 提供 IV
+      },
+      cryptoKey,          // the key
+      encodedData         // data to encrypt
+    );
+
+    // 5. 组合 IV 和加密后的数据 (包含认证标签) 并转换为十六进制字符串
+    const encryptedDataBytes = new Uint8Array(encryptedBuffer);
+    const hexCiphertext = bytesToHex(encryptedDataBytes);
+    const hexIv = bytesToHex(iv);
+
+    // 返回包含 IV 和加密数据的 JSON 字符串 (符合之前的格式，但不含单独authTag)
     return JSON.stringify({
-      iv: iv.toString('hex'),
-      data: encrypted,
-      authTag: authTag.toString('hex')
+      iv: hexIv,
+      data: hexCiphertext
+      // 注意: AES-GCM 的认证标签是包含在加密结果中的，不需要单独存储
     });
+
   } catch (error) {
-    console.error('加密数据时出错:', error);
+    console.error('使用 Web Crypto 加密数据时出错:', error);
+    // 出错时返回未加密的 JSON 字符串
     return JSON.stringify(data);
   }
 }
@@ -107,8 +151,8 @@ export async function POST(request: Request) {
     // 记录请求参数
     console.log('接收到行程生成请求:', body);
 
-    // 保存旅行偏好到数据库
-    const encryptedData = encryptData({
+    // 保存旅行偏好到数据库 - 使用 await 调用异步加密函数
+    const encryptedDataJsonString = await encryptData({
       ip: request.headers.get('x-forwarded-for') || 'unknown',
       userAgent: request.headers.get('user-agent') || 'unknown',
       timestamp: new Date().toISOString()
@@ -124,7 +168,8 @@ export async function POST(request: Request) {
         preference: body.preference,
         budget: body.budget,
         user_id: body.user_id,
-        encrypted_data: JSON.parse(encryptedData)
+        // 直接传递加密后的JSON字符串
+        encrypted_data: encryptedDataJsonString 
       });
       
       if (savedPreference) {
@@ -151,7 +196,8 @@ export async function POST(request: Request) {
             summary: itinerary.summary,
             is_ai_generated: true,
             user_id: body.user_id,
-            encrypted_data: JSON.parse(encryptedData),
+            // 直接传递加密后的JSON字符串
+            encrypted_data: encryptedDataJsonString,
             title: itinerary.title,
             plan: itinerary.plan,
             highlights: itinerary.highlights
@@ -185,9 +231,10 @@ export async function POST(request: Request) {
             start_date: mockItinerary.startDate,
             end_date: mockItinerary.endDate,
             summary: mockItinerary.summary,
-            is_ai_generated: false,
+            is_ai_generated: false, // 标记为非AI生成
             user_id: body.user_id,
-            encrypted_data: JSON.parse(encryptedData),
+            // 直接传递加密后的JSON字符串
+            encrypted_data: encryptedDataJsonString,
             title: mockItinerary.title,
             plan: mockItinerary.plan,
             highlights: mockItinerary.highlights
@@ -252,19 +299,6 @@ async function generateCozeItinerary(params: TravelParams): Promise<Itinerary> {
     ${params.travelers ? `出行人数: ${params.travelers}` : ''}
     ${params.preference ? `特殊偏好: ${params.preference}` : ''}
     ${params.budget ? `预算: ${params.budget}元人民币` : ''}
-    
-    请提供包括${params.destination ? params.destination : '目的地'}、每日活动安排（时间、活动描述、地点）、住宿推荐、交通方式和必去景点的详细行程规划。
-    
-    请按以下格式返回：
-    
-    旅行推荐：
-    [简洁的目的地和旅行概述]
-    
-    行程规划：
-    [详细的每日行程安排]
-    
-    旅行红黑榜：
-    [值得体验的项目和需要避开的坑]
   `;
 
   // 构建Coze API请求体

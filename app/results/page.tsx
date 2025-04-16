@@ -98,6 +98,26 @@ export default function ResultsPage() {
     }
   }, []);
 
+  // 添加刷新确认提示
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // 标准方式来触发确认对话框
+      event.preventDefault(); 
+      // 某些浏览器需要设置 returnValue
+      event.returnValue = '刷新页面会丢失当前方案并重新生成，确定要刷新吗？'; 
+      // 大多数浏览器也支持直接返回字符串
+      return '刷新页面会丢失当前方案并重新生成，确定要刷新吗？'; 
+    };
+
+    // 添加事件监听器
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 组件卸载时移除监听器
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []); // 空依赖数组确保只在挂载和卸载时运行
+
   // 生成行程的函数
   const generateItinerary = async (travelParams: TravelParams) => {
     setLoading(true);
@@ -260,7 +280,7 @@ export default function ResultsPage() {
                   <CardTitle className="text-xl text-slate-800">详细行程规划</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[400px] overflow-y-auto pt-4 px-5">
-                  <div className="prose prose-slate max-w-none prose-headings:text-indigo-700 prose-a:text-indigo-600">
+                  <div className="prose prose-slate max-w-none prose-headings:text-indigo-700 prose-a:text-indigo-600 whitespace-pre-line">
                     <ReactMarkdown 
                       rehypePlugins={[rehypeRaw]}
                       remarkPlugins={[remarkGfm]}
@@ -280,16 +300,17 @@ export default function ResultsPage() {
                   <CardTitle className="text-xl text-slate-800">小红书旅行评价参考</CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[400px] overflow-y-auto pt-4 px-5 custom-scrollbar">
-                  <div className="prose prose-slate max-w-none prose-strong:text-rose-600">
+                  <div className="max-w-none whitespace-pre-line [&>p]:mb-1 [&>ul]:list-disc [&>ul]:pl-5 [&>ul_>li]:mb-1 [&>ul]:my-1">
                     <ReactMarkdown 
                       rehypePlugins={[rehypeRaw]}
                       remarkPlugins={[remarkGfm]}
-                      components={{
-                        strong: ({node, ...props}) => <strong className="font-bold text-rose-600" {...props} />
-                      }}
-                    >
-                      {itinerary.highlights}
-                    </ReactMarkdown>
+                      children={itinerary.highlights
+                        .replace(/\n{2,}/g, '\n')
+                        .split('\n')
+                        .filter(line => line.trim() !== '')
+                        .join('\n')
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -297,26 +318,31 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* 操作按钮 */}
-        <div className="flex justify-center gap-4 mt-8">
-          <Button 
-            onClick={handleBack}
-            variant="outline" 
-            className="border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg px-6">
-            返回修改
-          </Button>
-          <Button
-            onClick={handleRegenerate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-6 shadow-md"
-            disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                生成中...
-              </>
-            ) : "重新生成"}
-          </Button>
-        </div>
+        {/* 按钮区域 */}
+        {!error && ( // 仅在没有错误时显示按钮
+          <div className="flex justify-center gap-4 mt-8 mb-4">
+            <Button 
+              onClick={handleBack} 
+              variant="outline"
+              className="bg-white text-indigo-600 border-indigo-600 hover:bg-indigo-50"
+              disabled={loading}
+            >
+              返回修改
+            </Button>
+            <Button 
+              onClick={handleRegenerate} 
+              disabled={loading}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  生成中...
+                </>
+              ) : "重新生成"}
+            </Button>
+          </div>
+        )}
       </main>
     </div>
   );

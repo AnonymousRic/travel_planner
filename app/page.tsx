@@ -208,7 +208,7 @@ export default function Home() {
                   className="border-slate-300 placeholder:text-slate-300"
                   disabled={isSubmitting}
                 />
-              </div>
+        </div>
               
               <div className="flex flex-col space-y-1 mt-0 mb-1">
                 <div className="flex justify-between items-center">
