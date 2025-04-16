@@ -31,20 +31,29 @@ export interface StoredItinerary {
   highlights?: string;   // 旅行红黑榜部分
 }
 
-// 创建Supabase客户端
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// 初始化 Supabase 客户端
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY || '';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase URL或Key未配置，数据库功能将不可用');
-  console.log('环境变量检查:', {
-    hasSupabaseUrl: !!process.env.SUPABASE_URL,
-    hasNextPublicSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasSupabaseKey: !!process.env.SUPABASE_KEY && process.env.SUPABASE_KEY.substring(0, 10) + '...',
-    hasNextPublicSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_KEY,
-    hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
-  });
-}
+// 检查环境变量是否存在 (示例性，实际客户端初始化可能不同)
+console.log("Supabase URL (Public):", supabaseUrl ? 'Set' : 'Not Set');
+console.log("Supabase Anon Key (Public):", supabaseKey ? 'Set' : 'Not Set');
+console.log("Supabase Service Role Key:", process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not Set');
+
+// 这里可以添加更多的 Supabase 客户端初始化逻辑
+// ...
+
+// 示例：导出一个函数，用于检查环境变量的配置状态
+export const checkEnvVars = () => {
+  return {
+    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL, // 使用 NEXT_PUBLIC_ 前缀
+    hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_KEY && process.env.NEXT_PUBLIC_SUPABASE_KEY.substring(0, 10) + '...', // 使用 NEXT_PUBLIC_ 前缀
+    hasCozeApiKey: !!process.env.COZE_API_KEY,
+    hasCozeWorkflowId: !!process.env.COZE_WORKFLOW_ID,
+    hasCozeApiEndpoint: !!process.env.COZE_API_ENDPOINT,
+  };
+};
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
