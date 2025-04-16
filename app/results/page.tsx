@@ -304,12 +304,7 @@ export default function ResultsPage() {
                     <ReactMarkdown 
                       rehypePlugins={[rehypeRaw]}
                       remarkPlugins={[remarkGfm]}
-                      children={itinerary.highlights
-                        .replace(/\n{2,}/g, '\n')
-                        .split('\n')
-                        .filter(line => line.trim() !== '')
-                        .join('\n')
-                      }
+                      children={itinerary.highlights}
                     />
                   </div>
                 </CardContent>
